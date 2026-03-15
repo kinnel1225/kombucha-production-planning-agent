@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kombucha Brewery — Production Planning AI Agent</title>
+<style>
+:root {
+  --navy:   #1B3A5C;
+  --blue:   #2E75B6;
+  --ltblue: #D6E4F0;
+  --green:  #375623;
+  --lgreen: #D9EAD3;
+  --orange: #BF5700;
+  --lorange:#FCE5CD;
+  --red:    #C00000;
+  --lred:   #F4CCCC;
+  --yellow: #FFF2CC;
+  --gray:   #595959;
+  --light:  #F2F7FB;
+  --white:  #FFFFFF;
+  --border: #B8CCE4;
+  --shadow: 0 2px 12px rgba(27,58,92,0.10);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #EEF4FA; color: #222; font-size: 14px; }
+
+/* ── HEADER */
+.site-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+  color: #fff; padding: 0 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 16px rgba(0,0,0,.25);
+}
+.site-header h1 { font-size: 18px; font-weight: 700; letter-spacing: .4px; }
+.site-header .sub { font-size: 12px; opacity: .75; margin-top: 2px; }
+.gh-link { color: #fff; text-decoration: none; font-size: 12px; opacity: .85;
+  border: 1px solid rgba(255,255,255,.4); padding: 6px 14px; border-radius: 6px;
+  display: flex; align-items: center; gap: 6px; transition: opacity .2s; }
+.gh-link:hover { opacity: 1; background: rgba(255,255,255,.1); }
+
+/* ── TABS */
+.tab-bar { background: var(--navy); display: flex; gap: 2px; padding: 0 32px; border-bottom: 3px solid var(--blue); }
+.tab-btn { background: transparent; border: none; color: rgba(255,255,255,.6);
+  font-size: 13px; font-weight: 600; padding: 10px 18px; cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -3px; transition: all .2s; }
+.tab-btn:hover { color: #fff; }
+.tab-btn.active { color: #fff; border-bottom-color: #7EC8E3; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── LAYOUT */
+.container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: var(--gray); margin-bottom: 24px; }
+
+/* ── KPI CARDS */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.kpi-card { background: #fff; border-radius: 10px; box-shadow: var(--shadow);
+  padding: 18px 16px; border-top: 4px solid var(--blue); text-align: center; }
+.kpi-card.green { border-top-color: var(--green); }
+.kpi-card.orange { border-top-color: var(--orange); }
+.kpi-card.red { border-top-color: var(--red); }
+.kpi-card.navy { border-top-color: var(--navy); }
+.kpi-val { font-size: 32px; font-weight: 800; color: var(--navy); line-height: 1; }
+.kpi-card.green .kpi-val { color: var(--green); }
+.kpi-card.orange .kpi-val { color: var(--orange); }
+.kpi-card.red .kpi-val { color: var(--red); }
+.kpi-label { font-size: 11px; color: var(--gray); margin-top: 4px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── SECTION CARDS */
+.card { background: #fff; border-radius: 10px; box-shadow: var(--shadow);
+  margin-bottom: 24px; overflow: hidden; }
+.card-header { background: var(--navy); color: #fff; padding: 12px 20px;
+  font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card-header.blue { background: var(--blue); }
+.card-header.red { background: var(--red); }
+.card-header.green { background: var(--green); }
+.card-header.orange { background: var(--orange); }
+.card-body { padding: 20px; }
+
+/* ── TABLES */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead tr { background: var(--navy); color: #fff; }
+thead th { padding: 10px 12px; text-align: left; font-weight: 600; font-size: 12px;
+  white-space: nowrap; }
+tbody tr:nth-child(even) { background: var(--light); }
+tbody tr:hover { background: var(--ltblue); transition: background .15s; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; white-space: nowrap; }
+.badge-green  { background: var(--lgreen);  color: var(--green); }
+.badge-orange { background: var(--lorange); color: var(--orange); }
+.badge-red    { background: var(--lred);    color: var(--red); }
+.badge-blue   { background: var(--ltblue);  color: var(--blue); }
+.badge-gray   { background: #eee; color: #555; }
+
+/* ── ALERTS */
+.alert-list { display: flex; flex-direction: column; gap: 10px; }
+.alert-item { border-radius: 8px; padding: 12px 16px; border-left: 4px solid;
+  font-size: 13px; line-height: 1.5; }
+.alert-high   { background: #FEF2F2; border-color: var(--red); }
+.alert-medium { background: #FFFBEB; border-color: var(--orange); }
+.alert-info   { background: #EFF6FF; border-color: var(--blue); }
+.alert-cat    { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; opacity: .7; margin-bottom: 2px; }
+
+/* ── FORMS */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--navy); }
+.form-group input, .form-group select {
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  font-size: 13px; font-family: Arial, sans-serif; transition: border-color .2s; }
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(46,117,182,.12); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all .2s; font-family: Arial, sans-serif; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--navy); }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: #2a4018; }
+.btn-red { background: var(--red); color: #fff; font-size: 12px; padding: 6px 12px; }
+.btn-red:hover { background: #9b0000; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+
+/* ── RUN BANNER */
+.run-banner { background: linear-gradient(135deg, var(--green) 0%, #2a5c1a 100%);
+  color: #fff; padding: 16px 24px; border-radius: 10px; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; }
+.run-banner.warning { background: linear-gradient(135deg, var(--orange), #8c3d00); }
+.run-banner p { font-size: 13px; opacity: .9; margin-top: 4px; }
+
+/* ── GANTT */
+.gantt-wrap { overflow-x: auto; }
+.gantt-container { min-width: 800px; }
+.gantt-row { display: flex; align-items: center; min-height: 36px; border-bottom: 1px solid var(--border); }
+.gantt-row:nth-child(even) { background: var(--light); }
+.gantt-label { width: 200px; min-width: 200px; padding: 6px 12px; font-size: 12px;
+  font-weight: 600; color: var(--navy); }
+.gantt-label .tank { font-size: 10px; font-weight: 400; color: var(--gray); }
+.gantt-track { flex: 1; position: relative; height: 36px; }
+.gantt-bar { position: absolute; height: 22px; top: 7px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; font-size: 10px;
+  font-weight: 700; color: #fff; overflow: hidden; white-space: nowrap; }
+.gantt-bar.ferm { background: var(--blue); }
+.gantt-bar.bottle { background: var(--green); }
+.gantt-bar.atrisk { background: var(--orange); }
+.gantt-header { display: flex; margin-bottom: 4px; }
+.gantt-header-label { width: 200px; min-width: 200px; }
+.gantt-header-dates { flex: 1; display: flex; }
+.gantt-day-label { flex: 1; font-size: 10px; color: var(--gray); text-align: center; border-left: 1px solid var(--border); padding: 2px 0; }
+
+/* ── CHART BARS */
+.mini-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.mini-bar-bg { flex: 1; background: var(--light); border-radius: 4px; height: 12px; overflow: hidden; }
+.mini-bar-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+.mini-bar-val { font-size: 11px; font-weight: 700; width: 40px; text-align: right; }
+
+/* ── FOOTER */
+.site-footer { background: var(--navy); color: rgba(255,255,255,.55); text-align: center;
+  padding: 20px; font-size: 12px; margin-top: 40px; }
+.site-footer a { color: rgba(255,255,255,.7); text-decoration: none; }
+
+/* ── RESPONSIVE */
+@media(max-width:600px){
+  .site-header { padding: 0 16px; }
+  .container { padding: 16px 12px; }
+  .kpi-grid { grid-template-columns: repeat(2,1fr); }
+  .gantt-label { width: 120px; min-width: 120px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div>
+    <h1>🍵 Kombucha Brewery — Production Planning AI Agent</h1>
+    <div class="sub">Industrial Engineering Portfolio · Dynamic Production Planning &amp; Control</div>
+  </div>
+  <a class="gh-link" href="https://github.com/YOUR-USERNAME/kombucha-production-planner" target="_blank">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    View on GitHub
+  </a>
+</header>
+
+<!-- TAB BAR -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab-btn" onclick="switchTab('orders')">📋 Orders</button>
+  <button class="tab-btn" onclick="switchTab('inventory')">🧪 Inventory</button>
+  <button class="tab-btn" onclick="switchTab('tanks')">🏭 Tanks</button>
+  <button class="tab-btn" onclick="switchTab('schedule')">📅 Schedule</button>
+  <button class="tab-btn" onclick="switchTab('alerts')">🔍 Alerts</button>
+  <button class="tab-btn" onclick="switchTab('about')">ℹ️ About</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: DASHBOARD -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-dashboard" class="tab-panel active">
+<div class="container">
+  <div class="page-title">Production Planning Dashboard</div>
+  <div class="page-sub">Live production plan generated from current orders. Click <strong>▶ Run Agent</strong> after editing orders or inventory.</div>
+
+  <div id="run-banner" class="run-banner">
+    <div>
+      <strong>✅ Agent Last Run: <span id="last-run-time">—</span></strong>
+      <p id="run-summary">Click "Run Agent" to generate the production plan.</p>
+    </div>
+    <button class="btn btn-primary" onclick="runAgent()" style="background:#fff;color:var(--navy);min-width:140px">
+      ▶ Run Agent
+    </button>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card navy"><div class="kpi-val" id="kpi-orders">10</div><div class="kpi-label">Total Orders</div></div>
+    <div class="kpi-card navy"><div class="kpi-val" id="kpi-bottles">6,800</div><div class="kpi-label">Bottles Demanded</div></div>
+    <div class="kpi-card navy"><div class="kpi-val" id="kpi-batches">—</div><div class="kpi-label">Batches Planned</div></div>
+    <div class="kpi-card green"><div class="kpi-val" id="kpi-ontime">—</div><div class="kpi-label">On Schedule</div></div>
+    <div class="kpi-card orange"><div class="kpi-val" id="kpi-risk">—</div><div class="kpi-label">At Risk</div></div>
+    <div class="kpi-card red"><div class="kpi-val" id="kpi-shortages">—</div><div class="kpi-label">Ingredient Shortages</div></div>
+  </div>
+
+  <!-- Gantt Chart -->
+  <div class="card">
+    <div class="card-header">📅 Fermentation &amp; Bottling Gantt Chart</div>
+    <div class="card-body">
+      <div class="gantt-wrap" id="gantt-section">
+        <p style="color:var(--gray);font-size:13px">Run the agent to generate the Gantt chart.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Table -->
+  <div class="card">
+    <div class="card-header blue">📋 Production Schedule</div>
+    <div class="card-body">
+      <div class="tbl-wrap" id="schedule-table-wrap">
+        <p style="color:var(--gray);font-size:13px">Run the agent to generate the schedule.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flavor Demand Chart -->
+  <div class="card">
+    <div class="card-header">🍵 Demand by Flavor</div>
+    <div class="card-body" id="demand-chart">
+      <p style="color:var(--gray);font-size:13px">Run the agent to see demand breakdown.</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: ORDERS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-orders" class="tab-panel">
+<div class="container">
+  <div class="page-title">Customer Orders</div>
+  <div class="page-sub">Edit orders below, then run the agent to update the production plan.</div>
+
+  <div class="card">
+    <div class="card-header">➕ Add New Order</div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Flavor</label>
+          <select id="new-flavor">
+            <option>Original Kombucha</option>
+            <option>Ginger Lemon</option>
+            <option>Blueberry Lavender</option>
+            <option>Raspberry Rose</option>
+            <option>Mango Turmeric</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity (Bottles)</label>
+          <input type="number" id="new-qty" value="500" min="1"/>
+        </div>
+        <div class="form-group">
+          <label>Due Date</label>
+          <input type="date" id="new-due"/>
+        </div>
+        <div class="form-group">
+          <label>Priority (1=High)</label>
+          <select id="new-priority">
+            <option value="1">1 — High</option>
+            <option value="2">2 — Medium</option>
+            <option value="3">3 — Low</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="new-customer" placeholder="e.g. Whole Foods"/>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-green" onclick="addOrder()">➕ Add Order</button>
+        <button class="btn btn-primary" onclick="runAgent(); switchTab('dashboard')">▶ Run Agent</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📋 Current Orders (<span id="order-count">0</span>)</div>
+    <div class="card-body">
+      <div class="tbl-wrap">
+        <table id="orders-table">
+          <thead><tr>
+            <th>Order ID</th><th>Flavor</th><th>Qty (Bottles)</th>
+            <th>Due Date</th><th>Priority</th><th>Customer</th><th>Action</th>
+          </tr></thead>
+          <tbody id="orders-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: INVENTORY -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-inventory" class="tab-panel">
+<div class="container">
+  <div class="page-title">Ingredient &amp; Packaging Inventory</div>
+  <div class="page-sub">Update stock levels to reflect current warehouse counts. Agent will flag shortages automatically.</div>
+  <div class="card">
+    <div class="card-header">🧪 Current Inventory</div>
+    <div class="card-body">
+      <div class="tbl-wrap">
+        <table id="inv-table">
+          <thead><tr>
+            <th>Material</th><th>Stock Level</th><th>Unit</th>
+            <th>Safety Stock</th><th>Reorder Point</th><th>Status</th>
+          </tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: TANKS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-tanks" class="tab-panel">
+<div class="container">
+  <div class="page-title">Fermentation Tanks</div>
+  <div class="page-sub">Monitor tank availability and capacity. Tanks in use are automatically considered in scheduling.</div>
+  <div class="card">
+    <div class="card-header">🏭 Tank Fleet</div>
+    <div class="card-body">
+      <div class="tbl-wrap">
+        <table id="tanks-table">
+          <thead><tr>
+            <th>Tank ID</th><th>Capacity (L)</th><th>Status</th>
+            <th>Available Date</th><th>Temp Control</th><th>Notes</th>
+          </tr></thead>
+          <tbody id="tanks-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header green">📊 Tank Utilization</div>
+    <div class="card-body" id="tank-util-chart"></div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: SCHEDULE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-schedule" class="tab-panel">
+<div class="container">
+  <div class="page-title">Full Production Schedule</div>
+  <div class="page-sub">Complete batch-level schedule generated by the planning agent.</div>
+  <div class="card">
+    <div class="card-header">📅 All Batches</div>
+    <div class="card-body">
+      <div class="tbl-wrap" id="full-schedule-wrap">
+        <p style="color:var(--gray);font-size:13px">Run the agent from the Dashboard tab first.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: ALERTS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-alerts" class="tab-panel">
+<div class="container">
+  <div class="page-title">Bottleneck Detection &amp; Alerts</div>
+  <div class="page-sub">All insights generated by the agent's bottleneck detection module.</div>
+  <div id="alerts-container">
+    <p style="color:var(--gray);font-size:13px">Run the agent from the Dashboard tab first.</p>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB: ABOUT -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-about" class="tab-panel">
+<div class="container">
+  <div class="page-title">About This Project</div>
+  <div class="page-sub">Industrial Engineering Portfolio — Bradley University</div>
+
+  <div class="card">
+    <div class="card-header">🏗 System Architecture</div>
+    <div class="card-body">
+      <p style="line-height:1.8;color:#333;margin-bottom:16px">
+        This tool is a browser-based port of a Python production planning AI agent. The full Python version reads/writes Microsoft Excel using <strong>pandas</strong> and <strong>openpyxl</strong>. This web version replicates all 9 pipeline steps in pure JavaScript so the system runs without any installation.
+      </p>
+      <table>
+        <thead><tr><th>Step</th><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>load_data()</code></td><td>Load all data from Excel / browser state</td></tr>
+          <tr><td>2</td><td><code>forecast_demand()</code></td><td>Aggregate orders by flavor, sort by priority + due date</td></tr>
+          <tr><td>3</td><td><code>convert_to_batches()</code></td><td>Convert bottles → liters → batch sizes</td></tr>
+          <tr><td>4</td><td><code>check_materials()</code></td><td>BOM explosion vs. inventory stock levels</td></tr>
+          <tr><td>5–6</td><td><code>assign_tanks_and_schedule()</code></td><td>Greedy EDD tank assignment + fermentation dates</td></tr>
+          <tr><td>7</td><td><code>schedule_bottling()</code></td><td>Bottling slot assignment with overload detection</td></tr>
+          <tr><td>8</td><td><code>detect_bottlenecks()</code></td><td>Consolidate all alerts and insights</td></tr>
+          <tr><td>9</td><td><code>write_output()</code></td><td>Render results to Dashboard, Schedule, Alerts tabs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header blue">🔬 IE Concepts Applied</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>Concept</th><th>Application</th></tr></thead>
+        <tbody>
+          <tr><td><strong>MRP</strong></td><td>BOM explosion × batch count vs. current inventory</td></tr>
+          <tr><td><strong>Capacity Planning</strong></td><td>Tank utilization + bottling line constraint</td></tr>
+          <tr><td><strong>Scheduling Theory</strong></td><td>EDD greedy policy with priority sort</td></tr>
+          <tr><td><strong>Theory of Constraints</strong></td><td>Bottleneck detection across materials, tanks, bottling</td></tr>
+          <tr><td><strong>Inventory Management</strong></td><td>Safety stock alerts + reorder point tracking</td></tr>
+          <tr><td><strong>DES Logic</strong></td><td>State: Available → Fermenting → Bottling → Done</td></tr>
+          <tr><td><strong>Quality Metrics</strong></td><td>Yield % tracking (produced vs. waste)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header green">📦 Tech Stack</div>
+    <div class="card-body">
+      <div class="form-grid" style="gap:10px">
+        <div style="background:var(--light);border-radius:8px;padding:14px">
+          <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Python Agent</div>
+          <div style="font-size:12px;color:#555">pandas · openpyxl · datetime<br/>Runs locally, reads/writes Excel</div>
+        </div>
+        <div style="background:var(--light);border-radius:8px;padding:14px">
+          <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Web App (this page)</div>
+          <div style="font-size:12px;color:#555">Pure HTML + CSS + JS<br/>Zero dependencies, GitHub Pages</div>
+        </div>
+        <div style="background:var(--light);border-radius:8px;padding:14px">
+          <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Future State</div>
+          <div style="font-size:12px;color:#555">PuLP LP optimizer · ARIMA forecasting<br/>Arena DES · Power BI dashboard</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header orange">🔗 Links</div>
+    <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+      <a href="https://github.com/YOUR-USERNAME/kombucha-production-planner" target="_blank" class="btn btn-primary">📁 GitHub Repository</a>
+      <a href="https://github.com/YOUR-USERNAME/kombucha-production-planner/blob/main/src/kombucha_agent.py" target="_blank" class="btn" style="background:var(--light);color:var(--navy)">🐍 Python Source</a>
+      <a href="https://github.com/YOUR-USERNAME/kombucha-production-planner/raw/main/data/kombucha_brewery.xlsx" target="_blank" class="btn" style="background:var(--light);color:var(--navy)">📊 Download Excel</a>
+    </div>
+  </div>
+</div>
+</div>
+
+<footer class="site-footer">
+  Kombucha Brewery — Dynamic Production Planning AI Agent &nbsp;|&nbsp;
+  Industrial Engineering Portfolio &nbsp;|&nbsp;
+  <a href="https://github.com/YOUR-USERNAME/kombucha-production-planner">GitHub</a>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+const TODAY = new Date();
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function fmt(d) { if(!d) return ''; return d.toISOString().slice(0,10); }
+function fmtShort(d) { if(!d) return ''; return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+let state = {
+  orders: [
+    {id:'ORD-001',flavor:'Original Kombucha',qty:1500,due:fmt(addDays(TODAY,14)),priority:1,customer:'Whole Foods Chicago'},
+    {id:'ORD-002',flavor:'Ginger Lemon',qty:800,due:fmt(addDays(TODAY,12)),priority:2,customer:'Fresh Market Peoria'},
+    {id:'ORD-003',flavor:'Blueberry Lavender',qty:600,due:fmt(addDays(TODAY,18)),priority:3,customer:'Natural Grocers'},
+    {id:'ORD-004',flavor:'Raspberry Rose',qty:400,due:fmt(addDays(TODAY,20)),priority:3,customer:'Midwest Co-op'},
+    {id:'ORD-005',flavor:'Original Kombucha',qty:1000,due:fmt(addDays(TODAY,21)),priority:1,customer:'Jewel-Osco'},
+    {id:'ORD-006',flavor:'Ginger Lemon',qty:500,due:fmt(addDays(TODAY,25)),priority:2,customer:'Target Grocery'},
+    {id:'ORD-007',flavor:'Mango Turmeric',qty:700,due:fmt(addDays(TODAY,16)),priority:2,customer:'Fresh Thyme'},
+    {id:'ORD-008',flavor:'Blueberry Lavender',qty:300,due:fmt(addDays(TODAY,22)),priority:3,customer:'Green Earth Market'},
+    {id:'ORD-009',flavor:'Original Kombucha',qty:600,due:fmt(addDays(TODAY,30)),priority:1,customer:"Sam's Club"},
+    {id:'ORD-010',flavor:'Mango Turmeric',qty:400,due:fmt(addDays(TODAY,28)),priority:2,customer:'Sprouts'},
+  ],
+  inventory: [
+    {id:'MAT-001',name:'Green Tea (kg)',stock:45,unit:'kg',safety:10,reorder:15},
+    {id:'MAT-002',name:'Black Tea (kg)',stock:30,unit:'kg',safety:8,reorder:12},
+    {id:'MAT-003',name:'Cane Sugar (kg)',stock:80,unit:'kg',safety:20,reorder:30},
+    {id:'MAT-004',name:'SCOBY Starter Culture',stock:12,unit:'qty',safety:3,reorder:5},
+    {id:'MAT-005',name:'Ginger Extract (L)',stock:8,unit:'L',safety:2,reorder:4},
+    {id:'MAT-006',name:'Lemon Juice (L)',stock:15,unit:'L',safety:3,reorder:5},
+    {id:'MAT-007',name:'Blueberry Puree (kg)',stock:6,unit:'kg',safety:2,reorder:4},
+    {id:'MAT-008',name:'Lavender Extract (L)',stock:3,unit:'L',safety:1,reorder:2},
+    {id:'MAT-009',name:'Raspberry Puree (kg)',stock:9,unit:'kg',safety:2,reorder:4},
+    {id:'MAT-010',name:'Rose Water (L)',stock:4,unit:'L',safety:1,reorder:2},
+    {id:'MAT-011',name:'Mango Puree (kg)',stock:10,unit:'kg',safety:3,reorder:5},
+    {id:'MAT-012',name:'Turmeric Powder (kg)',stock:2,unit:'kg',safety:0.5,reorder:1},
+    {id:'MAT-013',name:'Glass Bottles (500mL)',stock:4800,unit:'qty',safety:500,reorder:1000},
+    {id:'MAT-014',name:'Bottle Caps',stock:5000,unit:'qty',safety:500,reorder:1000},
+    {id:'MAT-015',name:'Labels',stock:4500,unit:'qty',safety:500,reorder:800},
+  ],
+  tanks: [
+    {id:'T-01',cap:200,status:'Available',avail:fmt(TODAY),temp:true,notes:'Primary fermentation'},
+    {id:'T-02',cap:200,status:'Available',avail:fmt(TODAY),temp:true,notes:'Primary fermentation'},
+    {id:'T-03',cap:200,status:'In Use',avail:fmt(addDays(TODAY,3)),temp:true,notes:'Fermenting Original'},
+    {id:'T-04',cap:150,status:'Available',avail:fmt(TODAY),temp:true,notes:'Small batch specialty'},
+    {id:'T-05',cap:150,status:'In Use',avail:fmt(addDays(TODAY,5)),temp:true,notes:'Fermenting Ginger'},
+    {id:'T-06',cap:100,status:'Maintenance',avail:fmt(addDays(TODAY,7)),temp:false,notes:'Maintenance until +7d'},
+    {id:'T-07',cap:200,status:'Available',avail:fmt(TODAY),temp:true,notes:'Secondary tank'},
+    {id:'T-08',cap:200,status:'Available',avail:fmt(TODAY),temp:true,notes:'Secondary tank'},
+  ],
+  bom: {
+    'Original Kombucha': [
+      {mat:'Green Tea (kg)',qty:2},{mat:'Cane Sugar (kg)',qty:16},
+      {mat:'SCOBY Starter Culture',qty:1},{mat:'Glass Bottles (500mL)',qty:400},{mat:'Bottle Caps',qty:400},{mat:'Labels',qty:400}
+    ],
+    'Ginger Lemon': [
+      {mat:'Green Tea (kg)',qty:2},{mat:'Cane Sugar (kg)',qty:15},
+      {mat:'SCOBY Starter Culture',qty:1},{mat:'Ginger Extract (L)',qty:4},{mat:'Lemon Juice (L)',qty:6},
+      {mat:'Glass Bottles (500mL)',qty:400},{mat:'Bottle Caps',qty:400},{mat:'Labels',qty:400}
+    ],
+    'Blueberry Lavender': [
+      {mat:'Black Tea (kg)',qty:2},{mat:'Cane Sugar (kg)',qty:15},
+      {mat:'SCOBY Starter Culture',qty:1},{mat:'Blueberry Puree (kg)',qty:8},{mat:'Lavender Extract (L)',qty:1.5},
+      {mat:'Glass Bottles (500mL)',qty:400},{mat:'Bottle Caps',qty:400},{mat:'Labels',qty:400}
+    ],
+    'Raspberry Rose': [
+      {mat:'Black Tea (kg)',qty:2},{mat:'Cane Sugar (kg)',qty:14},
+      {mat:'SCOBY Starter Culture',qty:1},{mat:'Raspberry Puree (kg)',qty:7},{mat:'Rose Water (L)',qty:2},
+      {mat:'Glass Bottles (500mL)',qty:400},{mat:'Bottle Caps',qty:400},{mat:'Labels',qty:400}
+    ],
+    'Mango Turmeric': [
+      {mat:'Green Tea (kg)',qty:2},{mat:'Cane Sugar (kg)',qty:14},
+      {mat:'SCOBY Starter Culture',qty:1},{mat:'Mango Puree (kg)',qty:9},{mat:'Turmeric Powder (kg)',qty:0.5},
+      {mat:'Glass Bottles (500mL)',qty:400},{mat:'Bottle Caps',qty:400},{mat:'Labels',qty:400}
+    ]
+  },
+  bottling: { bph: 450, hours: 8 },
+  schedule: [],
+  insights: []
+};
+const FERM_DAYS = 10;
+const LITERS_PER_BOTTLE = 0.355;
+
+// ═══════════════════════════════════════════════════════
+//  AGENT LOGIC (JS port of Python pipeline)
+// ═══════════════════════════════════════════════════════
+function runAgent() {
+  const startTime = Date.now();
+
+  // STEP 2 – forecast demand
+  const demand = {};
+  for(const o of state.orders) {
+    if(!demand[o.flavor]) demand[o.flavor] = {total:0, earliest:o.due, priority:o.priority, count:0};
+    demand[o.flavor].total += o.qty;
+    demand[o.flavor].count++;
+    if(o.due < demand[o.flavor].earliest) demand[o.flavor].earliest = o.due;
+    if(o.priority < demand[o.flavor].priority) demand[o.flavor].priority = o.priority;
+  }
+
+  // STEP 3 – convert to batches
+  const maxCap = Math.max(...state.tanks.map(t=>t.cap));
+  const batches = [];
+  const demandSorted = Object.entries(demand).sort((a,b)=>{
+    if(a[1].priority !== b[1].priority) return a[1].priority - b[1].priority;
+    return a[1].earliest.localeCompare(b[1].earliest);
+  });
+  for(const [flavor, d] of demandSorted) {
+    const totalL = d.total * LITERS_PER_BOTTLE;
+    const nFull = Math.floor(totalL / maxCap);
+    const rem = totalL % maxCap;
+    for(let i=0;i<nFull;i++) batches.push({flavor,liters:maxCap,bottles:Math.round(maxCap/LITERS_PER_BOTTLE),due:d.earliest,priority:d.priority});
+    if(rem > 0) batches.push({flavor,liters:Math.round(rem*10)/10,bottles:Math.round(rem/LITERS_PER_BOTTLE),due:d.earliest,priority:d.priority});
+  }
+
+  // STEP 4 – check materials
+  const matAlerts = [];
+  const invMap = {};
+  for(const i of state.inventory) invMap[i.name] = {...i};
+  for(const [flavor, d] of demandSorted) {
+    const recipe = state.bom[flavor];
+    if(!recipe) continue;
+    const nb = batches.filter(b=>b.flavor===flavor).length;
+    for(const {mat,qty} of recipe) {
+      const needed = qty * nb;
+      const inv = invMap[mat];
+      if(!inv) continue;
+      const stock = inv.stock;
+      if(needed > stock) {
+        matAlerts.push({type:'SHORTAGE',mat,flavor,needed:Math.round(needed*10)/10,stock,shortage:Math.round((needed-stock)*10)/10});
+      } else if(stock <= inv.reorder) {
+        matAlerts.push({type:'LOW_STOCK',mat,flavor,needed:Math.round(needed*10)/10,stock,shortage:0});
+      }
+    }
+  }
+
+  // STEPS 5&6 – assign tanks
+  const tankState = state.tanks.map(t=>({...t, availD: new Date(t.avail)}));
+  const schedule = [];
+  for(const batch of batches) {
+    const eligible = tankState.filter(t=>t.cap >= batch.liters && t.status !== 'Maintenance' || (t.status==='Maintenance' && new Date(t.avail) <= new Date())).sort((a,b)=>a.availD-b.availD);
+    const eligible2 = tankState.filter(t=>t.cap >= batch.liters).sort((a,b)=>a.availD-b.availD);
+    if(!eligible2.length){ schedule.push({...batch,tank:'NONE',fermStart:null,fermEnd:null,bottleDate:null,actualBottle:null,status:'NO_TANK'}); continue; }
+    const tank = eligible2[0];
+    const fermStart = new Date(Math.max(TODAY.getTime(), tank.availD.getTime()));
+    const fermEnd = addDays(fermStart, FERM_DAYS);
+    const bottleDate = addDays(fermEnd, 1);
+    const due = new Date(batch.due);
+    const late = bottleDate > due;
+    schedule.push({
+      ...batch, tank: tank.id,
+      fermStart: fmt(fermStart), fermEnd: fmt(fermEnd),
+      bottleDate: fmt(bottleDate), actualBottle: fmt(bottleDate),
+      status: late ? 'AT_RISK_LATE' : 'ON_SCHEDULE'
+    });
+    // update tank availability
+    const idx = tankState.findIndex(t=>t.id===tank.id);
+    tankState[idx].availD = fermEnd;
+  }
+
+  // STEP 7 – bottling
+  const dayCapacity = state.bottling.bph * state.bottling.hours;
+  const dailyUsed = {};
+  for(const s of schedule) {
+    if(!s.bottleDate) continue;
+    let d = s.bottleDate;
+    for(let i=0;i<14;i++){
+      if(!dailyUsed[d]) dailyUsed[d]=0;
+      if(dailyUsed[d]+s.bottles <= dayCapacity) break;
+      d = fmt(addDays(new Date(d),1));
+    }
+    dailyUsed[d] = (dailyUsed[d]||0)+s.bottles;
+    s.actualBottle = d;
+    s.bottlingOverload = dailyUsed[d] > dayCapacity;
+  }
+
+  // STEP 8 – bottlenecks
+  const insights = [];
+  for(const t of state.tanks) {
+    if(t.avail > fmt(TODAY)) {
+      insights.push({cat:'TANK_STATUS',sev:'INFO',msg:`Tank ${t.id} will become available on ${t.avail}.`});
+    }
+  }
+  for(const a of matAlerts) {
+    if(a.type==='SHORTAGE') insights.push({cat:'INGREDIENT_SHORTAGE',sev:'HIGH',msg:`🔴 SHORTAGE: '${a.mat}' needs ${a.needed} ${(invMap[a.mat]||{}).unit||''} but only ${a.stock} in stock (short by ${a.shortage})`});
+    else insights.push({cat:'LOW_INVENTORY',sev:'MEDIUM',msg:`🟡 LOW STOCK: '${a.mat}' is at ${a.stock} — place order soon`});
+  }
+  for(const s of schedule) {
+    if(s.status==='AT_RISK_LATE') insights.push({cat:'LATE_ORDER_RISK',sev:'HIGH',msg:`⚠️  ${s.flavor} (due ${s.due}) will bottle ${s.actualBottle} — AT RISK of late delivery.`});
+  }
+  const overloadDays = Object.entries(dailyUsed).filter(([,v])=>v>dayCapacity);
+  for(const [d] of overloadDays) insights.push({cat:'BOTTLING_OVERLOAD',sev:'HIGH',msg:`Bottling line capacity EXCEEDED on ${d}.`});
+  // start-soon
+  const tomorrow = fmt(addDays(TODAY,1));
+  for(const s of schedule) {
+    if(s.fermStart === tomorrow) insights.push({cat:'ACTION_REQUIRED',sev:'INFO',msg:`▶ Start brewing ${s.flavor} tomorrow in tank ${s.tank} to meet demand.`});
+  }
+
+  state.schedule = schedule;
+  state.insights = insights;
+
+  // STEP 9 – render
+  renderDashboard(schedule, insights, matAlerts, demand, dayCapacity);
+  renderScheduleTab(schedule);
+  renderAlerts(insights, matAlerts);
+
+  const elapsed = ((Date.now()-startTime)/1000).toFixed(2);
+  document.getElementById('last-run-time').textContent = new Date().toLocaleTimeString() + ` (${elapsed}s)`;
+  const onTime = schedule.filter(s=>s.status==='ON_SCHEDULE').length;
+  const atRisk = schedule.filter(s=>s.status==='AT_RISK_LATE').length;
+  const shorts = matAlerts.filter(a=>a.type==='SHORTAGE').length;
+  document.getElementById('run-summary').textContent =
+    `${schedule.length} batches planned · ${onTime} on schedule · ${atRisk} at risk · ${shorts} ingredient shortages · ${insights.length} total insights`;
+  const banner = document.getElementById('run-banner');
+  banner.className = atRisk > 0 ? 'run-banner warning' : 'run-banner';
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER FUNCTIONS
+// ═══════════════════════════════════════════════════════
+function renderDashboard(schedule, insights, matAlerts, demand, dayCapacity) {
+  const totalBottles = state.orders.reduce((s,o)=>s+o.qty,0);
+  document.getElementById('kpi-orders').textContent = state.orders.length;
+  document.getElementById('kpi-bottles').textContent = totalBottles.toLocaleString();
+  document.getElementById('kpi-batches').textContent = schedule.length;
+  document.getElementById('kpi-ontime').textContent = schedule.filter(s=>s.status==='ON_SCHEDULE').length;
+  document.getElementById('kpi-risk').textContent = schedule.filter(s=>s.status==='AT_RISK_LATE').length;
+  document.getElementById('kpi-shortages').textContent = matAlerts.filter(a=>a.type==='SHORTAGE').length;
+
+  // Schedule table
+  const wrap = document.getElementById('schedule-table-wrap');
+  wrap.innerHTML = buildScheduleTable(schedule, true);
+
+  // Gantt
+  renderGantt(schedule);
+
+  // Demand chart
+  const dc = document.getElementById('demand-chart');
+  const maxBottles = Math.max(...Object.values(demand).map(d=>d.total));
+  const colors = ['#2E75B6','#375623','#BF5700','#C00000','#6B3FA0'];
+  dc.innerHTML = Object.entries(demand).map(([fl,d],i)=>`
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">${fl}</div>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${Math.round(d.total/maxBottles*100)}%;background:${colors[i%colors.length]}"></div></div>
+        <div class="mini-bar-val" style="color:${colors[i%colors.length]}">${d.total.toLocaleString()}</div>
+      </div>
+    </div>`).join('');
+}
+
+function buildScheduleTable(schedule, compact) {
+  const rows = schedule.map((s,i)=>{
+    const statusBadge = s.status==='ON_SCHEDULE'
+      ? '<span class="badge badge-green">ON SCHEDULE</span>'
+      : s.status==='AT_RISK_LATE'
+        ? '<span class="badge badge-orange">AT RISK</span>'
+        : '<span class="badge badge-red">NO TANK</span>';
+    return `<tr>
+      <td><strong>${s.flavor}</strong></td>
+      <td style="text-align:center">${s.liters}L</td>
+      <td style="text-align:center"><span class="badge badge-blue">${s.tank}</span></td>
+      <td>${s.fermStart||'—'}</td>
+      <td>${s.fermEnd||'—'}</td>
+      <td>${s.actualBottle||'—'}</td>
+      <td style="text-align:center">${s.bottles.toLocaleString()}</td>
+      <td>${s.due}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+  return `<table>
+    <thead><tr>
+      <th>Flavor</th><th>Batch</th><th>Tank</th>
+      <th>Ferm. Start</th><th>Ferm. End</th><th>Bottling Date</th>
+      <th>Bottles</th><th>Due Date</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderGantt(schedule) {
+  if(!schedule.length) return;
+  const container = document.getElementById('gantt-section');
+
+  // Build date range
+  const allDates = schedule.flatMap(s=>[s.fermStart, s.actualBottle]).filter(Boolean).map(d=>new Date(d));
+  const minD = new Date(Math.min(...allDates.map(d=>d.getTime())));
+  const maxD = new Date(Math.max(...allDates.map(d=>d.getTime())));
+  const totalDays = Math.ceil((maxD-minD)/(86400000))+2;
+
+  function dayOffset(dateStr) {
+    if(!dateStr) return 0;
+    return Math.ceil((new Date(dateStr)-minD)/(86400000));
+  }
+  function dayWidth(startStr, endStr) {
+    if(!startStr||!endStr) return 0;
+    return Math.max(1, Math.ceil((new Date(endStr)-new Date(startStr))/(86400000)));
+  }
+
+  // Date headers (every 3 days)
+  const dateHeaders = [];
+  for(let i=0;i<=totalDays;i+=3){
+    const d = addDays(minD, i);
+    dateHeaders.push(`<div class="gantt-day-label" style="width:${3/totalDays*100}%">${fmtShort(d)}</div>`);
+  }
+
+  const rows = schedule.map(s=>{
+    const fStart = dayOffset(s.fermStart);
+    const fLen = dayWidth(s.fermStart, s.fermEnd);
+    const bStart = dayOffset(s.actualBottle);
+    const isRisk = s.status==='AT_RISK_LATE';
+    const fermPct = fStart/totalDays*100;
+    const fermW = fLen/totalDays*100;
+    const bottlePct = bStart/totalDays*100;
+    return `<div class="gantt-row">
+      <div class="gantt-label">${s.flavor.split(' ').slice(0,2).join(' ')}<br><span class="tank">${s.tank} · ${s.liters}L</span></div>
+      <div class="gantt-track">
+        <div class="gantt-bar ferm${isRisk?' atrisk':''}" style="left:${fermPct}%;width:${fermW}%">Ferm</div>
+        <div class="gantt-bar bottle" style="left:${bottlePct}%;width:${1/totalDays*100}%;background:${isRisk?'var(--orange)':'var(--green)'}">🍾</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="gantt-container">
+      <div style="display:flex;margin-bottom:8px">
+        <div style="width:200px;min-width:200px"></div>
+        <div style="flex:1;display:flex">${dateHeaders.join('')}</div>
+      </div>
+      ${rows}
+      <div style="margin-top:12px;font-size:11px;color:var(--gray);display:flex;gap:16px">
+        <span><span style="display:inline-block;width:14px;height:10px;background:var(--blue);border-radius:2px;margin-right:4px"></span>Fermentation (On Schedule)</span>
+        <span><span style="display:inline-block;width:14px;height:10px;background:var(--orange);border-radius:2px;margin-right:4px"></span>Fermentation (At Risk)</span>
+        <span><span style="display:inline-block;width:14px;height:10px;background:var(--green);border-radius:2px;margin-right:4px"></span>Bottling Day</span>
+      </div>
+    </div>`;
+}
+
+function renderScheduleTab(schedule) {
+  document.getElementById('full-schedule-wrap').innerHTML = buildScheduleTable(schedule, false);
+}
+
+function renderAlerts(insights, matAlerts) {
+  const cont = document.getElementById('alerts-container');
+  if(!insights.length){ cont.innerHTML='<p style="color:var(--gray);font-size:13px">No alerts — run the agent first.</p>'; return; }
+
+  const high = insights.filter(i=>i.sev==='HIGH');
+  const med  = insights.filter(i=>i.sev==='MEDIUM');
+  const info = insights.filter(i=>i.sev==='INFO');
+
+  const group = (title,items,cls,headerCls)=> items.length ? `
+    <div class="card"><div class="card-header ${headerCls}">${title} (${items.length})</div>
+    <div class="card-body"><div class="alert-list">
+      ${items.map(i=>`<div class="alert-item alert-${cls}">
+        <div class="alert-cat">${i.cat.replace(/_/g,' ')}</div>
+        ${i.msg}
+      </div>`).join('')}
+    </div></div></div>` : '';
+
+  cont.innerHTML =
+    group('🔴 High Severity', high, 'high', 'red') +
+    group('🟡 Medium Severity', med, 'medium', 'orange') +
+    group('🔵 Info / Actions', info, 'info', 'blue');
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABLE RENDERS (Orders, Inventory, Tanks)
+// ═══════════════════════════════════════════════════════
+function renderOrders() {
+  const tbody = document.getElementById('orders-tbody');
+  tbody.innerHTML = state.orders.map(o=>`
+    <tr>
+      <td><span class="badge badge-blue">${o.id}</span></td>
+      <td><strong>${o.flavor}</strong></td>
+      <td style="text-align:right">${o.qty.toLocaleString()}</td>
+      <td>${o.due}</td>
+      <td style="text-align:center"><span class="badge ${o.priority===1?'badge-red':o.priority===2?'badge-orange':'badge-gray'}">${o.priority}</span></td>
+      <td>${o.customer}</td>
+      <td><button class="btn btn-red btn-sm" onclick="deleteOrder('${o.id}')">✕</button></td>
+    </tr>`).join('');
+  document.getElementById('order-count').textContent = state.orders.length;
+  document.getElementById('kpi-orders').textContent = state.orders.length;
+  document.getElementById('kpi-bottles').textContent = state.orders.reduce((s,o)=>s+o.qty,0).toLocaleString();
+}
+
+function renderInventory() {
+  const tbody = document.getElementById('inv-tbody');
+  tbody.innerHTML = state.inventory.map(i=>{
+    const isShort = i.stock < i.safety;
+    const isLow   = !isShort && i.stock <= i.reorder;
+    const badge = isShort ? '<span class="badge badge-red">SHORTAGE</span>'
+                : isLow   ? '<span class="badge badge-orange">LOW STOCK</span>'
+                           : '<span class="badge badge-green">OK</span>';
+    return `<tr style="${isShort?'background:#FEF2F2':isLow?'background:#FFFBEB':''}">
+      <td><strong>${i.name}</strong></td>
+      <td style="text-align:right"><input type="number" value="${i.stock}" min="0" style="width:80px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:12px" onchange="updateStock('${i.id}',this.value)"/></td>
+      <td>${i.unit}</td>
+      <td style="text-align:right">${i.safety}</td>
+      <td style="text-align:right">${i.reorder}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTanks() {
+  const tbody = document.getElementById('tanks-tbody');
+  tbody.innerHTML = state.tanks.map(t=>{
+    const badge = t.status==='Available'
+      ? '<span class="badge badge-green">Available</span>'
+      : t.status==='In Use'
+        ? '<span class="badge badge-orange">In Use</span>'
+        : '<span class="badge badge-red">Maintenance</span>';
+    return `<tr>
+      <td><strong>${t.id}</strong></td>
+      <td style="text-align:center">${t.cap}L</td>
+      <td>${badge}</td>
+      <td>${t.avail}</td>
+      <td style="text-align:center">${t.temp?'✅':'❌'}</td>
+      <td style="color:var(--gray);font-size:12px">${t.notes}</td>
+    </tr>`;
+  }).join('');
+
+  // Utilization bars
+  const uc = document.getElementById('tank-util-chart');
+  const maxCap = Math.max(...state.tanks.map(t=>t.cap));
+  uc.innerHTML = state.tanks.map(t=>{
+    const pct = Math.round(t.cap/maxCap*100);
+    const color = t.status==='Available'?'var(--green)':t.status==='In Use'?'var(--orange)':'var(--red)';
+    return `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">${t.id} — ${t.cap}L</div>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="mini-bar-val" style="color:${color}">${t.status}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════
+let orderCounter = 11;
+function addOrder() {
+  const flavor = document.getElementById('new-flavor').value;
+  const qty    = parseInt(document.getElementById('new-qty').value)||0;
+  const due    = document.getElementById('new-due').value || fmt(addDays(TODAY,14));
+  const pri    = parseInt(document.getElementById('new-priority').value)||2;
+  const cust   = document.getElementById('new-customer').value || 'New Customer';
+  if(!flavor||qty<=0){ alert('Please enter a valid flavor and quantity.'); return; }
+  state.orders.push({id:`ORD-${String(orderCounter++).padStart(3,'0')}`,flavor,qty,due,priority:pri,customer:cust});
+  renderOrders();
+}
+function deleteOrder(id) {
+  state.orders = state.orders.filter(o=>o.id!==id);
+  renderOrders();
+}
+function updateStock(id, val) {
+  const item = state.inventory.find(i=>i.id===id);
+  if(item) { item.stock = parseFloat(val)||0; renderInventory(); }
+}
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  const names = ['dashboard','orders','inventory','tanks','schedule','alerts','about'];
+  btns[names.indexOf(name)].classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+document.getElementById('new-due').value = fmt(addDays(TODAY,14));
+renderOrders();
+renderInventory();
+renderTanks();
+runAgent();  // auto-run on load
+</script>
+</body>
+</html>
